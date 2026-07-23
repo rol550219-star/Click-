@@ -8,18 +8,17 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-# Твой токен бота
-TOKEN = "8709482604:AAEV1qPp4twI7wPpYRHyDxbhNqZzzEMTqSM"
+TOKEN = "8685276551:AAHaWurnWMqaxPMx8_GhyqG9DQ4iQdtO06E"
 
-# Словарь для сохранения баланса игроков (ключ — ID пользователя, значение — количество очков)
+# Словарь для сохранения баланса игроков
 scores = {}
-
 
 # Команда /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🎮 Добро пожаловать в кликер!\n\n"
-        "Введи команду **/gameclicker**, чтобы открыть игровую панель с кнопкой TAP.",
+        "Натапай **500 очков**, чтобы пройти первый этап (после этого баланс сбросится на 0, и можно будет тапать бесконечно).\n"
+        "Введи команду **/gameclicker**, чтобы открыть игровую панель.",
         parse_mode='Markdown'
     )
 
@@ -32,57 +31,61 @@ async def gameclicker_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     current_score = scores[user.id]
 
-    # Создаем клавиатуру с одной кнопкой TAP
     keyboard = [
         [InlineKeyboardButton("👆 TAP", callback_data="click_action")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # Отправляем сообщение с балансом и кнопкой
-    await update.message.reply_text(
-        f"🏆 **Твой кликер**\n\nБаланс: **{current_score}** очков",
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
+    if current_score > 500:
+        text = f"🏆 **Твой кликер**\n\nБаланс: **{current_score}** очков (свободный режим)"
+    else:
+        text = f"🏆 **Твой кликер**\n\nБаланс: **{current_score} / 500** очков"
+
+    await update.message.reply_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
 
 # Обработчик нажатия на кнопку TAP
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
-    await query.answer() # Подтверждаем нажатие
+    await query.answer()
 
     user = query.from_user
     if user.id not in scores:
         scores[user.id] = 0
 
-    # Добавляем +1 очко
     scores[user.id] += 1
     current_score = scores[user.id]
 
-    # Обновляем текст в сообщении с новым балансом
+    if current_score == 500:
+        scores[user.id] = 0
+        await query.edit_message_text(
+            f"🎉 Поздравляем, @{user.username or user.first_name}!\n\n"
+            "Ты натапал **500 очков**! Твой баланс сброшен на 0, теперь можешь тапать дальше сколько угодно.",
+            parse_mode='Markdown'
+        )
+        return
+
+    if current_score > 500:
+        text = f"🏆 **Твой кликер**\n\nБаланс: **{current_score}** очков (свободный режим)"
+    else:
+        text = f"🏆 **Твой кликер**\n\nБаланс: **{current_score} / 500** очков"
+
     keyboard = [
         [InlineKeyboardButton("👆 TAP", callback_data="click_action")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await query.edit_message_text(
-        f"🏆 **Твой кликер**\n\nБаланс: **{current_score}** очков",
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
+    await query.edit_message_text(text, reply_markup=reply_markup, parse_mode='Markdown')
 
 
 # Главная функция запуска
 if __name__ == '__main__':
-    print("Бот-кликер с кнопкой запускается...")
+    print("Бот-кликер запускается...")
     
     application = ApplicationBuilder().token(TOKEN).build()
 
-    # Добавляем обработчики
     application.add_handler(CommandHandler('start', start_command))
     application.add_handler(CommandHandler('gameclicker', gameclicker_command))
-    
-    # Обработчик нажатий на инлайн-кнопки
     application.add_handler(CallbackQueryHandler(button_handler, pattern="click_action"))
 
     print("Бот работает!")
